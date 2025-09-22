@@ -40,19 +40,67 @@ EXEPATH = ./
 .CFILES   = $(MAINFILES) $(MUSASHIFILES) $(MUSASHIGENCFILES)
 .OFILES   = $(.CFILES:%.c=%.o) a314/a314.o
 
-CC        = gcc
-CXX       = g++
+CROSS_COMPILE ?=
+
+ifeq ($(origin CC),default)
+DEFAULT_CC := yes
+else ifeq ($(origin CC),undefined)
+DEFAULT_CC := yes
+else
+DEFAULT_CC := no
+endif
+
+ifeq ($(origin CXX),default)
+DEFAULT_CXX := yes
+else ifeq ($(origin CXX),undefined)
+DEFAULT_CXX := yes
+else
+DEFAULT_CXX := no
+endif
+
+ifeq ($(DEFAULT_CC),yes)
+CC        := gcc
+endif
+
+ifeq ($(DEFAULT_CXX),yes)
+CXX       := g++
+endif
+
+ifneq ($(strip $(CROSS_COMPILE)),)
+ifeq ($(DEFAULT_CC),yes)
+CC        := $(CROSS_COMPILE)gcc
+endif
+ifeq ($(DEFAULT_CXX),yes)
+CXX       := $(CROSS_COMPILE)g++
+endif
+endif
+
+HOSTCC    ?= gcc
 WARNINGS  = -Wall -Wextra -pedantic
 
+VC_PATH          ?= /opt/vc
+VC_INCLUDE_PATH  ?= $(VC_PATH)/include
+VC_LIB_PATH      ?= $(VC_PATH)/lib
+RAYLIB_PATH      ?= ./raylib
+RAYLIB_DRM_PATH  ?= ./raylib_drm
+RAYLIB_PI4_PATH  ?= ./raylib_pi4_test
+LOCAL_LIB_PATH   ?= /usr/local/lib
+
+SYSROOT ?=
+ifneq ($(strip $(SYSROOT)),)
+SYSROOT_CFLAGS := --sysroot=$(SYSROOT)
+SYSROOT_LFLAGS := --sysroot=$(SYSROOT)
+endif
+
 ifeq ($(PLATFORM),PI3_BULLSEYE)
-	LFLAGS    = $(WARNINGS) -L/usr/local/lib -L/opt/vc/lib -L./raylib_drm -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
-	CFLAGS    = $(WARNINGS) -I. -I./raylib -I/opt/vc/include/ -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(LOCAL_LIB_PATH) -L$(VC_LIB_PATH) -L$(RAYLIB_DRM_PATH) -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
+        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -I. -I$(RAYLIB_PATH) -I$(RAYLIB_DRM_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
 else ifeq ($(PLATFORM),PI4)
-	LFLAGS    = $(WARNINGS) -L/usr/local/lib -L/opt/vc/lib -L./raylib_pi4_test -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
-	CFLAGS    = $(WARNINGS) -DRPI4_TEST -I. -I./raylib_pi4_test -I/opt/vc/include/ -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(LOCAL_LIB_PATH) -L$(VC_LIB_PATH) -L$(RAYLIB_PI4_PATH) -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
+        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -DRPI4_TEST -I. -I$(RAYLIB_PATH) -I$(RAYLIB_PI4_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
 else
-	CFLAGS    = $(WARNINGS) -I. -I./raylib -I/opt/vc/include/ -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
-	LFLAGS    = $(WARNINGS) -L/opt/vc/lib -L./raylib -lraylib -lbrcmGLESv2 -lbrcmEGL -lbcm_host -lstdc++ -lvcos -lvchiq_arm -lasound
+        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -I. -I$(RAYLIB_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(VC_LIB_PATH) -L$(RAYLIB_PATH) -lraylib -lbrcmGLESv2 -lbrcmEGL -lbcm_host -lstdc++ -lvcos -lvchiq_arm -lasound
 endif
 
 TARGET = $(EXENAME)$(EXE)
@@ -65,7 +113,7 @@ all: $(MUSASHIGENCFILES) $(MUSASHIGENHFILES) $(TARGET) buptest
 clean:
 	rm -f $(DELETEFILES)
 
-$(TARGET):  $(MUSAHIGENCFILES:%.c=%.o) $(.CFILES:%.c=%.o) a314/a314.o
+$(TARGET):  $(MUSASHIGENCFILES:%.c=%.o) $(.CFILES:%.c=%.o) a314/a314.o
 	$(CC) -o $@ $^ -O3 -pthread $(LFLAGS) -lm -lstdc++
 
 buptest: buptest.c gpio/ps_protocol.c
@@ -78,6 +126,6 @@ $(MUSASHIGENCFILES) $(MUSASHIGENHFILES): $(MUSASHIGENERATOR)$(EXE)
 	$(EXEPATH)$(MUSASHIGENERATOR)$(EXE)
 
 $(MUSASHIGENERATOR)$(EXE):  $(MUSASHIGENERATOR).c
-	$(CC) -o  $(MUSASHIGENERATOR)$(EXE)  $(MUSASHIGENERATOR).c
+	$(HOSTCC) -o  $(MUSASHIGENERATOR)$(EXE)  $(MUSASHIGENERATOR).c
 
 -include $(.CFILES:%.c=%.d) $(MUSASHIGENCFILES:%.c=%.d) a314/a314.d $(MUSASHIGENERATOR).d

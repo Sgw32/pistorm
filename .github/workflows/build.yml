@@ -1,0 +1,66 @@
+name: Build PiStorm Emulator
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable armhf architecture
+        run: sudo dpkg --add-architecture armhf
+
+      - name: Install cross-compilation toolchain and dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            pkg-config \
+            libasound2-dev:armhf \
+            libdrm-dev:armhf \
+            libgbm-dev:armhf \
+            libegl1-mesa:armhf \
+            libegl1-mesa-dev:armhf \
+            libgles2-mesa:armhf \
+            libgles2-mesa-dev:armhf \
+            mesa-common-dev:armhf
+
+      - name: Fetch Raspberry Pi firmware userland
+        run: |
+          git clone --depth 1 https://github.com/raspberrypi/firmware.git rpi-firmware
+          echo "VC_PATH=$(pwd)/rpi-firmware/hardfp/opt/vc" >> "$GITHUB_ENV"
+
+      - name: Build PiStorm emulator
+        env:
+          CROSS_COMPILE: arm-linux-gnueabihf-
+          PLATFORM: PI3_BULLSEYE
+          VC_PATH: ${{ env.VC_PATH }}
+          LOCAL_LIB_PATH: /usr/lib/arm-linux-gnueabihf
+        run: |
+          make clean
+          make CROSS_COMPILE="$CROSS_COMPILE" PLATFORM="$PLATFORM" VC_PATH="$VC_PATH" LOCAL_LIB_PATH="$LOCAL_LIB_PATH"
+
+      - name: Inspect build outputs
+        run: |
+          file emulator
+          file buptest
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pistorm-rpi3-build
+          path: |
+            emulator
+            buptest
