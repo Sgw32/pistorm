@@ -18,6 +18,15 @@ jobs:
       - name: Enable armhf architecture
         run: sudo dpkg --add-architecture armhf
 
+      - name: Configure armhf apt sources
+        run: |
+          sudo tee /etc/apt/sources.list.d/ubuntu-armhf.list <<'EOF'
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-backports main universe multiverse restricted
+          EOF
+
       - name: Install cross-compilation toolchain and dependencies
         env:
           DEBIAN_FRONTEND: noninteractive
