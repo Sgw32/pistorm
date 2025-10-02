@@ -92,14 +92,26 @@ SYSROOT_CFLAGS := --sysroot=$(SYSROOT)
 SYSROOT_LFLAGS := --sysroot=$(SYSROOT)
 endif
 
+ARM_ARCH_FLAGS    ?= -march=armv8-a
+ARM_FLOAT_FLAGS   ?= -mfloat-abi=hard -mfpu=neon-fp-armv8
+
+CC_BASENAME := $(notdir $(firstword $(CC)))
+ifneq ($(filter aarch64%,$(CC_BASENAME)),)
+ARM_FLOAT_FLAGS :=
+else ifneq ($(filter aarch64%,$(CROSS_COMPILE)),)
+ARM_FLOAT_FLAGS :=
+endif
+
+COMMON_CFLAGS = $(WARNINGS) $(SYSROOT_CFLAGS) -I. -I$(RAYLIB_PATH) -I$(VC_INCLUDE_PATH) $(ARM_ARCH_FLAGS) $(ARM_FLOAT_FLAGS) -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+
 ifeq ($(PLATFORM),PI3_BULLSEYE)
         LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(LOCAL_LIB_PATH) -L$(VC_LIB_PATH) -L$(RAYLIB_DRM_PATH) -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
-        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -I. -I$(RAYLIB_PATH) -I$(RAYLIB_DRM_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        CFLAGS    = $(COMMON_CFLAGS) -I$(RAYLIB_DRM_PATH)
 else ifeq ($(PLATFORM),PI4)
         LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(LOCAL_LIB_PATH) -L$(VC_LIB_PATH) -L$(RAYLIB_PI4_PATH) -lraylib -lGLESv2 -lEGL -lgbm -ldrm -ldl -lstdc++ -lvcos -lvchiq_arm -lvchostif -lasound
-        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -DRPI4_TEST -I. -I$(RAYLIB_PATH) -I$(RAYLIB_PI4_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        CFLAGS    = $(COMMON_CFLAGS) -DRPI4_TEST -I$(RAYLIB_PI4_PATH)
 else
-        CFLAGS    = $(WARNINGS) $(SYSROOT_CFLAGS) -I. -I$(RAYLIB_PATH) -I$(VC_INCLUDE_PATH) -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -lstdc++ $(ACFLAGS)
+        CFLAGS    = $(COMMON_CFLAGS)
         LFLAGS    = $(WARNINGS) $(SYSROOT_LFLAGS) -L$(VC_LIB_PATH) -L$(RAYLIB_PATH) -lraylib -lbrcmGLESv2 -lbrcmEGL -lbcm_host -lstdc++ -lvcos -lvchiq_arm -lasound
 endif
 
@@ -117,10 +129,10 @@ $(TARGET):  $(MUSASHIGENCFILES:%.c=%.o) $(.CFILES:%.c=%.o) a314/a314.o
 	$(CC) -o $@ $^ -O3 -pthread $(LFLAGS) -lm -lstdc++
 
 buptest: buptest.c gpio/ps_protocol.c
-	$(CC) $^ -o $@ -I./ -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O0
+	$(CC) $^ -o $@ -I./ $(ARM_ARCH_FLAGS) $(ARM_FLOAT_FLAGS) -O0
 
 a314/a314.o: a314/a314.cc a314/a314.h
-	$(CXX) -MMD -MP -c -o a314/a314.o -O3 a314/a314.cc -march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8 -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -I. -I..
+	$(CXX) -MMD -MP -c -o a314/a314.o a314/a314.cc $(ARM_ARCH_FLAGS) $(ARM_FLOAT_FLAGS) -O3 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -I. -I..
 
 $(MUSASHIGENCFILES) $(MUSASHIGENHFILES): $(MUSASHIGENERATOR)$(EXE)
 	$(EXEPATH)$(MUSASHIGENERATOR)$(EXE)

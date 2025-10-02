@@ -1,75 +1,69 @@
-name: Build PiStorm Emulator
+name: Cross compile for ARM64
 
-on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
+on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: debian:11
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Check out repo
+        uses: actions/checkout@v3
 
-      - name: Enable armhf architecture
-        run: sudo dpkg --add-architecture armhf
+      - name: Configure arm64 packages
+        run: dpkg --add-architecture arm64
 
-      - name: Configure armhf apt sources
-        run: |
-          sudo tee /etc/apt/sources.list.d/ubuntu-armhf.list <<'EOF'
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main universe multiverse restricted
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main universe multiverse restricted
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main universe multiverse restricted
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-backports main universe multiverse restricted
-          EOF
-
-      - name: Install cross-compilation toolchain and dependencies
+      - name: Install cross compiler and build utils
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             build-essential \
-            gcc-arm-linux-gnueabihf \
-            g++-arm-linux-gnueabihf \
+            cmake \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
             pkg-config \
-            libasound2-dev:armhf \
-            libdrm-dev:armhf \
-            libgbm-dev:armhf \
-            libegl1-mesa:armhf \
-            libegl1-mesa-dev:armhf \
-            libgles2-mesa:armhf \
-            libgles2-mesa-dev:armhf \
-            mesa-common-dev:armhf
+            git \
+            libasound2-dev:arm64 \
+            libdrm-dev:arm64 \
+            libgbm-dev:arm64 \
+            libegl1-mesa:arm64 \
+            libegl1-mesa-dev:arm64 \
+            libgles2-mesa:arm64 \
+            libgles2-mesa-dev:arm64 \
+            mesa-common-dev:arm64
 
       - name: Fetch Raspberry Pi firmware userland
         run: |
           git clone --depth 1 https://github.com/raspberrypi/firmware.git rpi-firmware
-          echo "VC_PATH=$(pwd)/rpi-firmware/hardfp/opt/vc" >> "$GITHUB_ENV"
+          echo "VC_PATH=$(pwd)/rpi-firmware/opt/vc" >> "$GITHUB_ENV"
 
-      - name: Build PiStorm emulator
+      - name: Cross compile emulator
         env:
-          CROSS_COMPILE: arm-linux-gnueabihf-
+          CROSS_COMPILE: aarch64-linux-gnu-
           PLATFORM: PI3_BULLSEYE
-          VC_PATH: ${{ env.VC_PATH }}
-          LOCAL_LIB_PATH: /usr/lib/arm-linux-gnueabihf
         run: |
+          SYSROOT="$(${CROSS_COMPILE}gcc -print-sysroot)"
           make clean
-          make CROSS_COMPILE="$CROSS_COMPILE" PLATFORM="$PLATFORM" VC_PATH="$VC_PATH" LOCAL_LIB_PATH="$LOCAL_LIB_PATH"
+          make \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            PLATFORM="$PLATFORM" \
+            VC_PATH="$VC_PATH" \
+            LOCAL_LIB_PATH=/usr/lib/aarch64-linux-gnu \
+            SYSROOT="$SYSROOT"
 
       - name: Inspect build outputs
         run: |
           file emulator
           file buptest
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
         with:
-          name: pistorm-rpi3-build
+          name: pistorm-emulator-arm64
           path: |
             emulator
             buptest
