@@ -14,7 +14,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#if defined(__has_include)
+// Bullseye/DRM builds ship without the legacy vc_tvservice headers, so only
+// include them when they are available.
+#if __has_include("interface/vmcs_host/vc_tvservice.h")
 #include "interface/vmcs_host/vc_tvservice.h"
+#endif
+#else
+#include "interface/vmcs_host/vc_tvservice.h"
+#endif
 
 #define RTG_INIT_ERR(a) { printf(a); *data->running = 0; }
 
