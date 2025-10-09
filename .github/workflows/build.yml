@@ -1,0 +1,70 @@
+name: Cross compile for ARM64
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:11
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+
+      - name: Configure arm64 packages
+        run: dpkg --add-architecture arm64
+
+      - name: Install cross compiler and build utils
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            build-essential \
+            cmake \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            git \
+            libasound2-dev:arm64 \
+            libdrm-dev:arm64 \
+            libgbm-dev:arm64 \
+            libegl1-mesa:arm64 \
+            libegl1-mesa-dev:arm64 \
+            libgles2-mesa:arm64 \
+            libgles2-mesa-dev:arm64 \
+            mesa-common-dev:arm64
+
+      - name: Fetch Raspberry Pi firmware userland
+        run: |
+          git clone --depth 1 https://github.com/raspberrypi/firmware.git rpi-firmware
+          echo "VC_PATH=$(pwd)/rpi-firmware/opt/vc" >> "$GITHUB_ENV"
+
+      - name: Cross compile emulator
+        env:
+          CROSS_COMPILE: aarch64-linux-gnu-
+          PLATFORM: PI3_BULLSEYE
+        run: |
+          SYSROOT="$(${CROSS_COMPILE}gcc -print-sysroot)"
+          make clean
+          make \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            PLATFORM="$PLATFORM" \
+            VC_PATH="$VC_PATH" \
+            LOCAL_LIB_PATH=/usr/lib/aarch64-linux-gnu \
+            SYSROOT="$SYSROOT"
+
+      - name: Inspect build outputs
+        run: |
+          file emulator
+          file buptest
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pistorm-emulator-arm64
+          path: |
+            emulator
+            buptest
